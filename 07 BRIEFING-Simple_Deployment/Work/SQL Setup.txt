@@ -1,0 +1,14 @@
+sudo apt update
+sudo apt install mysql-server
+
+sudo mysql -u root -p
+> SET old_passwords=0;
+> CREATE USER 'gitea' IDENTIFIED BY 'gitea';
+> CREATE DATABASE giteadb CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_unicode_ci';
+> GRANT ALL PRIVILEGES ON giteadb.* TO 'gitea';
+> FLUSH PRIVILEGES;
+> exit
+
+sudo mysql -u gitea -p giteadb
+
+sudo systemctl status mysql.service

@@ -1,0 +1,72 @@
+---
+- name: Delete Docker GPG apt Key
+  become: true
+  apt_key:
+    # url: https://download.docker.com/linux/ubuntu/gpg
+    url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+    state: absent
+
+- name: Delete Docker Repository
+  become: true
+  apt_repository:
+    #repo: deb https://download.docker.com/linux/ubuntu jammy stable
+    repo: "deb https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+    state: absent
+    filename: docker
+
+- name: Delete docker-ce
+  become: true
+  apt:
+    pkg:
+      - containerd.io # from docker doc
+      - docker-ce # from docker doc
+      - docker-ce-cli # from docker doc
+      - docker-buildx-plugin # from docker doc
+      - docker-compose-plugin # from docker doc
+    state: absent
+    update_cache: true
+
+- name: Delete pip docker-ce  
+  # become: true               <--- DO NOT DO THIS!!!
+  pip:
+    name:
+      - docker
+      - docker-compose
+    state: absent
+ 
+- name: Delete system packages
+  become: true
+  apt:
+    pkg:
+      - ca-certificates # from docker doc
+      - curl # from docker doc
+      - gnupg # from docker doc
+      - lsb-release # from docker doc
+      - apt-transport-https # APT transport for downloading via the HTTP Secure protocol (HTTPS)
+      - software-properties-common # This software provides an abstraction of the used apt repositories. It allows you to easily manage your distribution and independent software vendor software sources.
+      - python3-pip # pip is the package installer for Python
+      - virtualenv # A tool to create isolated Python environments.
+      - python3-setuptools # Setuptools is a collection of enhancements to the Python distutils that allow developers to more easily build and distribute Python packages, especially ones that have dependencies on other packages
+    state: absent
+    update_cache: true
+
+
+- name: Delete docker group 
+  become: true
+  group:
+    name: docker
+    state: absent
+
+- name: Delete docker group of users
+  become: true
+  user:
+    name: '{{ item.login }}'
+    groups: docker
+    append: yes
+  when: item.primarygroup == 'devops' or item.primarygroup == 'admins'
+  loop: "{{ vm_users }}"
+  loop_control:
+    label: "{{ item.login }}"
+
+# - meta: reset_connection # ?? must do this if using pipelining
+

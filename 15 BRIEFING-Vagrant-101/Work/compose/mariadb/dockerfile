@@ -1,0 +1,3 @@
+FROM mariadb:10.4
+USER root
+COPY --chown=root:root ./init/init.sql /docker-entrypoint-initdb.d/init.sql

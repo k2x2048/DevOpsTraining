@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Gitea status
+
+[Service]
+User=user
+WorkingDirectory=/home/user/scripts/
+ExecStart=/bin/bash /usr/bin/checkgitea.sh
+Restart=always
+
+[Install]
+WantedBy=single-user.target

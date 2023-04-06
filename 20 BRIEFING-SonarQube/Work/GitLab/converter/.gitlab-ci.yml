@@ -1,0 +1,184 @@
+---
+# # USED for docker runner
+image: docker:latest
+# image: docker:20.10.16-dind
+# services:
+#   - docker:dind
+
+
+stages: # Specify the different stages of this CI/CD pipeline.
+  # - .pre
+  - test
+  - sonarqube
+  - build
+  # - release
+  # - deploy
+  # - .post
+
+
+
+# variables: # These variables will be available via the CLI as $VARIABLE_NAME
+# #     # Tell docker CLI how to talk to Docker daemon.
+# #     # DOCKER_HOST: tcp://dockerdaemon:2375/
+#   DOCKER_HOST: tcp://docker:2375
+# #     # Use the overlayfs driver for improved performance.
+#   DOCKER_DRIVER: overlay2
+# #     # Disable TLS since we're running inside local network.
+#   DOCKER_TLS_CERTDIR: ""
+#     # use TLS https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#tls-enabled
+#     # mounts /certs directory for the service and build container
+#     # needed for the Docker client to use the certificates
+#     # DOCKER_TLS_CERTDIR: "/certs"
+
+unit_test-job:
+  image: python:3.7.16-slim
+  # image: python:slim
+  # image: python:3.9.16-slim
+  # image: python:3.9.16
+  stage: test
+  tags:
+    - docker
+  script:
+    - echo "Download requirements"
+    - pip install -r requirements.txt
+    - echo "Unit test"
+    - python manage.py test
+    - echo "Start test server"
+    - python manage.py runserver --noreload &
+    - echo "Waiting for server"
+    - sleep 30
+    - echo "Test server (curl)"
+    - apt-get update
+    - apt-get -y install curl
+    # - apk add curl 2>/dev/null
+    - curl -s http://127.0.0.1:8000/length/convert/
+  # artifacts:
+  #   paths:
+  #     - builds/
+  # allow_failure: true
+
+
+sonarqube-job:
+  stage: sonarqube
+  tags:
+    - docker
+  image: 
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script: 
+    - sonar-scanner
+  # allow_failure: true
+  only:
+    - master
+
+
+# sonar-scanner \
+#   -Dsonar.projectKey=betest1_converter_AYctX1rtilSHKewqEMJl \
+#   -Dsonar.sources=. \
+#   -Dsonar.host.url=http://127.0.0.1:9000 \
+#   -Dsonar.login=sqp_8bf1a9d4a60ca6caaabc30c0db29492fa2d99421
+
+# kvb2022
+# http://host.docker.internal:9000
+# http://localhost:9000
+# sonarqube
+
+# docker run \
+#     --rm \
+#     -e SONAR_HOST_URL="http://localhost:9000" \
+#     -e SONAR_SCANNER_OPTS="-Dsonar.projectKey=betest1_converter_AYctX1rtilSHKewqEMJl" \
+#     -e SONAR_LOGIN="sqp_8bf1a9d4a60ca6caaabc30c0db29492fa2d99421" \
+#     -v "./converter:/usr/src" \
+#     sonarsource/sonar-scanner-cli
+
+
+build_job:
+  image: docker:20.10.16
+  # image: docker:20.10.16-dind
+  # image: gitlab-runner:v15.8.2
+  stage: build
+  tags:
+    - docker
+  # services:
+  #   - docker:20.10.16-dind
+  variables:
+    CONTAINER_TEST_IMAGE: "test1"
+    IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+  script:
+    # CI_REGISTRY_USER: User actually of GitLab (gitlab-ci-token)
+    # CI_REGISTRY_PASSWORD: Password actually of GitLab
+    # CI_REGISTRY: "registry.gitlab.com"
+    # CI_PROJECT_PATH: "gitlab-example/my-project" (registry.gitlab.com/betest1/converter)
+    # CI_COMMIT_SHORT_SHA: Recent commit ID (0ee1a4ba)
+    # CI_COMMIT_REF_SLUG: (master)
+    # CI_REGISTRY_IMAGE" (registry.gitlab.com/betest1/converter)
+    
+    - docker info
+    - echo "login..."
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - echo "build..."
+    - docker build -t $CI_REGISTRY_IMAGE:latest .
+    # - echo "tag..."
+    # - docker tag $CI_REGISTRY_IMAGE:latest $CI_REGISTRY_IMAGE:latest
+    - echo "push..."
+    - docker push $CI_REGISTRY_IMAGE:latest
+  artifacts:
+    paths:
+      - builds/
+    reports:
+      junit: dist/*
+
+
+
+# docker login registry.gitlab.com
+# docker build -t registry.gitlab.com/betest1/converter .
+# docker push registry.gitlab.com/betest1/converter
+
+    # - docker build -t $CONTAINER_TEST_IMAGE -f Dockerfile .
+    # - docker build -t $CONTAINER_TEST_IMAGE -f Dockerfile .
+    # # Authentifie et envoie le conteneur sur le registre Docker
+    # - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    # - docker tag myproject $CI_REGISTRY_IMAGE/myproject:$CI_COMMIT_SHORT_SHA
+    # - docker push $CI_REGISTRY_IMAGE/$CONTAINER_TEST_IMAGE:$CI_COMMIT_SHORT_SHA
+
+  
+
+# docker run \
+#     --rm \
+#     -e SONAR_HOST_URL="http://${SONARQUBE_URL}" \
+#     -e SONAR_SCANNER_OPTS="-Dsonar.projectKey=${YOUR_PROJECT_KEY}" \
+#     -e SONAR_LOGIN="myAuthenticationToken" \
+#     -v "${YOUR_REPO}:/usr/src" \
+#     sonarsource/sonar-scanner-cli
+
+# build:
+#   stage: build
+#   script:
+#     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+#     - docker build -t $CONTAINER_TEST_IMAGE -f compose/production/django/Dockerfile .
+#     - docker push $CONTAINER_TEST_IMAGE
+
+# release:
+#   stage: release
+#   script:
+#     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+#     - docker pull $CONTAINER_TEST_IMAGE
+#     - docker tag $CONTAINER_TEST_IMAGE $CONTAINER_RELEASE_IMAGE
+#     - docker push $CONTAINER_RELEASE_IMAGE
+#   only:
+#     - master
+
+# docker run \
+#     --rm \
+#     -e SONAR_HOST_URL="http://${SONARQUBE_URL}" \
+#     -e SONAR_SCANNER_OPTS="-Dsonar.projectKey=${YOUR_PROJECT_KEY}" \
+#     -e SONAR_LOGIN="myAuthenticationToken" \
+#     -v "${YOUR_REPO}:/usr/src" \
+#     sonarsource/sonar-scanner-cli

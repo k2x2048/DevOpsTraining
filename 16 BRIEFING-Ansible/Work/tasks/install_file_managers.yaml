@@ -1,0 +1,36 @@
+---
+- name: Installation de MC et Double Commander
+  become: true
+  apt:
+    name:
+      - mc
+      - doublecmd-gtk
+      - net-tools
+    state: present
+
+- name: Make sure destination dir exists
+  become: true
+  file:
+    path: '/home/{{ item.login }}/.config/doublecmd/'
+    state: directory
+    owner: '{{ item.login }}' 
+    group: '{{ item.primarygroup }}' 
+    mode: '0700'
+  when: (item.primarygroup == 'devops') or (item.primarygroup == 'admins')
+  loop: '{{ vm_users }}' 
+  loop_control:
+    label: "{{ item.login }}"
+    
+    
+- name: Copy Double Commander config file
+  become: true
+  copy:
+    src: ./DATA/doublecmd/doublecmd.xml
+    dest: '/home/{{ item.login }}/.config/doublecmd/doublecmd.xml'
+    owner: '{{ item.login }}' 
+    group: '{{ item.primarygroup }}' 
+    mode: '0664'
+  when: (item.primarygroup == 'devops') or (item.primarygroup == 'admins')
+  loop: '{{ vm_users }}'
+  loop_control:
+    label: "{{ item.login }}"

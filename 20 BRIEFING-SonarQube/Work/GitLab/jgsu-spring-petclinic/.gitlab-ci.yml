@@ -1,0 +1,184 @@
+---
+# # USED for docker runner
+# image: maven:latest
+image: docker:20.10.16-dind
+# services:
+#   - docker:dind
+
+
+stages: # Specify the different stages of this CI/CD pipeline.
+  # - .pre
+  - unit_test
+  - build
+  - test
+  # - sonarqube
+  - release
+  # - deploy
+  # - .post
+
+
+variables: # These variables will be available via the CLI as $VARIABLE_NAME
+    # MAVEN_OPTS: "-Dhttps.protocols=TLSv1.2 -Dmaven.repo.local=./../.m2/repository -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN -Dorg.slf4j.simpleLogger.showDateTime=true -Djava.awt.headless=true"
+  # MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  # MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  # MAVEN_DEPLOY_OPTS: "-DskipTests"
+  # MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end"
+  MAVEN_CLI_OPTS: "--batch-mode"
+  # SHARED_PATH: /builds/$CI_PROJECT_PATH/shared/
+  # SPRING_PROFILES_ACTIVE: gitlab-ci
+  # DOCKER_DRIVER: overlay2
+  # DOCKER_HOST: tcp://docker:2375
+  # DOCKER_TLS_CERTDIR: ""
+
+
+# Cache downloaded dependencies and plugins between builds.
+# To keep cache across branches add 'key: "$CI_JOB_NAME"'
+# Be aware that `mvn deploy` will install the built jar into this repository. If you notice your cache size
+# increasing, consider adding `-Dmaven.install.skip=true` to `MAVEN_OPTS` or in `.mvn/maven.config`
+cache:
+  # key: $CI_COMMIT_REF_NAME # Using the predefined variable CI_COMMIT_REF_NAME as the cache key, you can ensure the cache is tied to a specific branch
+  # key: $CI_JOB_NAME # Using the predefined variable CI_JOB_NAME as the cache key, you can ensure the cache is tied to a specific job
+  key: "$CI_BUILD_REF_NAME" # keep cache across branch
+  paths:
+    - $CI_PROJECT_DIR/.m2/repository/ # This folder is cached between builds
+    # - $CI_PROJECT_DIR/.m2/
+    # key: mavenrepo
+    # key: "$CI_BUILD_REF_NAME"
+
+# before_script:
+#   - export MAVEN_USER_HOME=$(pwd)/.m2/repository
+
+unit_test-job:
+  # image: maven:latest
+  # image: openjdk:21-jdk-slim
+  image: eclipse-temurin:17-jdk-jammy
+  stage: unit_test
+  tags:
+    - docker
+  script:
+    - "echo cached = $CI_PROJECT_DIR/.m2/repository/"
+    - "echo MAVEN_USER_HOME = $MAVEN_USER_HOME"
+    - "./mvnw package"
+    - "./mvnw test"
+    # - 'bash ./mvnw $MAVEN_CLI_OPTS test'
+    # - find . -name "*.class" -exec touch {} \+
+  artifacts:
+    paths:
+      - target/
+  # allow_failure: true
+
+build_job: # Here we are specify a task that will run at our build stage
+  # image: maven:latest
+  image: eclipse-temurin:17-jdk-jammy
+  # image: openjdk:21-jdk-slim
+  # image: maven:3.9.0
+  # image: maven:3.6.1-jdk-11
+  # image: maven:3-openjdk-8
+  # image: maven:3.6.3-openjdk-15
+  # image: maven:3.8-openjdk-18-slim
+  # image: maven:3.8.7-openjdk-18-slim
+  # image: maven:3.8.7-openjdk-18
+  # image: maven:3.8.6-openjdk-11-slim
+  # image: maven:3-jdk-8
+  # image: maven:3-jdk-11
+  # image: openjdk:21-jdk-slim
+  stage: build # we specify the stage at which this will run
+  tags:
+    - docker
+  script:
+    # - './mvnw $MAVEN_CLI_OPTS compile'
+    # - 'bash ./mvnw dependency:resolve'
+    # - 'bash ./mvnw $MAVEN_CLI_OPTS clean package' # Build app
+    - "./mvnw package"
+    # - "bash ./mvnw package $MAVEN_CLI_OPTS -DskipTests"
+    # - "bash ./mvnw clean package $MAVEN_CLI_OPTS -DskipTests"
+    # - 'java -jar spring-petclinic.jar'
+  artifacts:
+  #   name: "BuildedApp"
+  #   # when: always
+  #   # expire_in: 1 hour
+    paths: 
+      - target/
+  #     # - target/*.jar
+  #     # - "*/target" # multi-modules
+  # # allow_failure: true
+
+test_job:
+  stage: test
+  tags:
+    - docker
+  image: tomcat:jre8-alpine
+  script:
+    # - java -jar spring-petclinic.jar
+    - java -jar target/*.jar &
+    - sleep 30
+    - curl http://localhost:8080
+  # dependencies: 
+  #  - build_job
+  artifacts:
+    paths:
+      - target/
+
+# # sonar.projectKey defines the name of the project in SonarQube.
+# # In this example it uses the same name of the project in GitLab.
+# # NOTE: this is NOT a git tag name.
+# # It is a GitLab tag associated in the runner section (see Step 3.
+# # Setup your project in the GÉANT deployment of GitLab)
+# sonarqube_ci_test:
+#   image: sonarsource/sonar-scanner-cli:latest
+#   # image: sonarsource/sonar-scanner-cli:${SONAR_SCANNER_CLI_VERSION}
+#   # image: sonarqube:latest
+#   stage: sonarqube
+#   variables:
+#     SONAR_PROJECT_BASE_DIR: "$CI_PROJECT_DIR"
+#   script:
+#     - /usr/bin/entrypoint.sh sonar-scanner -Dsonar.projectKey="$CI_PROJECT_NAME"
+#   tags:                                                                             
+#     - sonarqube
+
+
+# docker run \
+#     --rm \
+#     -e SONAR_HOST_URL="http://${SONARQUBE_URL}" \
+#     -e SONAR_SCANNER_OPTS="-Dsonar.projectKey=${YOUR_PROJECT_KEY}" \
+#     -e SONAR_LOGIN="myAuthenticationToken" \
+#     -v "${YOUR_REPO}:/usr/src" \
+#     sonarsource/sonar-scanner-cli
+
+
+release_job:
+  stage: release
+  tags:
+    - docker
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - docker build --pull -t "$CI_REGISTRY_IMAGE" .
+    - docker push $CI_REGISTRY_IMAGE:latest
+  # only:
+  #   - main
+  #   - dev
+
+
+# deploy:docker-image:
+#   stage: deploy
+#   tags:
+#     - docker
+#   variables:
+#     DOCKER_HOST: "ssh://deploy@$DOCKER_HOST_IP"
+#   before_script:
+#     # Configure SSH
+#     - eval $(ssh-agent -s)
+#     - echo "$SSH_PRIVATE_KEY" | ssh-add -
+#     - mkdir -p ~/.ssh
+#     - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+#     # Configure Docker
+#     - apk add docker-compose
+#     - docker login registry.gitlab.com -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+#   script:
+#     - docker-compose pull
+#     - docker-compose up -d --force-recreate
+#   after_script:
+#     - docker logout registry.gitlab.com
+#   only:
+#     - master

@@ -1,0 +1,48 @@
+sudo apt update
+
+sudo apt install wget
+
+sudo apt install git
+
+sudo wget -O /usr/local/bin/gitea https://dl.gitea.io/gitea/1.17.3/gitea-1.17.3-linux-amd64
+
+sudo chmod +x /usr/local/bin/gitea
+
+(gpg --keyserver keys.openpgp.org --recv 7C9E68152594688862D62AF62D9AE806EC1592E2)
+(gpg --verify gitea-1.17.3-linux-amd64.asc gitea-1.17.3-linux-amd64)
+
+gitea --version
+
+sudo adduser --system --shell /bin/bash --gecos 'Git Version Control' --group --disabled-password --home /home/git git
+sudo addgroup git
+
+sudo mkdir -p /var/lib/gitea/{custom,data,log}
+sudo chown -R git:git /var/lib/gitea/
+sudo chmod -R 750 /var/lib/gitea/
+sudo mkdir /etc/gitea
+sudo chown root:git /etc/gitea
+sudo chmod 770 /etc/gitea
+
+sudo wget https://raw.githubusercontent.com/go-gitea/gitea/main/contrib/systemd/gitea.service -P /etc/systemd/system
+
+
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now gitea
+
+sudo systemctl start gitea
+sudo systemctl stop gitea
+sudo systemctl status gitea
+
+
+hostname -I
+
+sudo ufw allow 3000/tcp
+sudo ufw enable
+sudo ufw status
+
+http://localhost:3000
+
+NOTE: /etc/gitea is temporarily set with write permissions for user git so that the web installer can write the configuration file. After the installation is finished, it is recommended to set permissions to read-only using:
+sudo chmod 750 /etc/gitea
+sudo chmod 640 /etc/gitea/app.ini

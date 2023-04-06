@@ -1,0 +1,6 @@
+FROM image: mariadb:10.4
+USER root
+RUN chown -R root:root /var/lib/mysql
+RUN chmod -R 755 /var/lib/mysql
+RUN chown root:root /docker-entrypoint-initdb.d/init.sql
+RUN chmod 755 /docker-entrypoint-initdb.d/init.sql

@@ -1,0 +1,158 @@
+# Users records
+vm_groups:
+  - name: devops
+    issystem: true
+    gid: 111
+
+  - name: admins
+    issystem: true
+    gid: 110
+
+  - name: users
+    issystem: false
+    gid: 112
+
+vm_groups_delete:
+  - devop
+  - devop1
+  - devop2
+  - devop3
+  - devops
+  - devops1
+  - devops2
+  - devops3
+  - admin
+  - admin1
+  - admin2
+  - admin3
+  - admins
+  - admins1
+  - admins2
+  - admins3
+  - user
+  - user1
+  - user2
+  - user3
+  - users1
+  - users2
+  - users3
+  - docker
+
+vm_users:
+  - devops1:
+    name: Devops1 Name
+    login: devops1
+    password: "{{ devops1pass_crypted | password_hash('sha512') }}"
+    groups: sudo,devops,admins
+    groupsappend: True
+    primarygroup: devops
+    shell: /bin/bash
+    comments:
+      - devops must use this
+
+  - devops2:
+    name: Devops2 Name
+    login: devops2
+    password: "{{ devops2pass_crypted | password_hash('sha512') }}"
+    groups: sudo,devops,admins
+    groupsappend: True
+    primarygroup: devops
+    shell: /bin/bash
+    comments:
+      - devops must use this
+
+  - devops3:
+    name: Devops3 Name
+    login: devops3
+    password: "{{ devops3pass_crypted | password_hash('sha512') }}"
+    groups: sudo,devops,admins
+    groupsappend: True
+    primarygroup: devops
+    shell: /bin/bash
+    comments:
+      - devops must use this
+
+  - admin1:
+    name: admin1 Name
+    login: admin1
+    password: "{{ admin1pass_crypted | password_hash('sha512') }}"
+    groups: sudo,admins
+    groupsappend: True
+    primarygroup: admins
+    shell: /bin/bash
+    comments:
+
+  - admin2:
+    name: admin2 Name
+    login: admin2
+    password: "{{ admin2pass_crypted | password_hash('sha512') }}"
+    groups: sudo,admins
+    groupsappend: True
+    primarygroup: admins
+    shell: /bin/bash
+    comments:
+
+  - admin3:
+    name: admin3 Name
+    login: admin3
+    password: "{{ admin3pass_crypted | password_hash('sha512') }}"
+    groups: sudo,admins
+    groupsappend: True
+    primarygroup: admins
+    shell: /bin/bash
+    comments:
+
+  - user1:
+    name: user1 Name
+    login: user1
+    password: "{{ user1pass_crypted | password_hash('sha512') }}"
+    groups: users
+    groupsappend: False
+    primarygroup: users
+    shell: /bin/bash
+    comments:
+
+  - user2:
+    name: user2 Name
+    login: user2
+    password: "{{ user2pass_crypted | password_hash('sha512') }}"
+    groups: users
+    groupsappend: False
+    primarygroup: users
+    shell: /bin/bash
+    comments:
+
+  - user3:
+    name: user3 Name
+    login: user3
+    password: "{{ user3pass_crypted | password_hash('sha512') }}"
+    groups: users
+    groupsappend: False
+    primarygroup: users
+    shell: /bin/bash # "{{ defaultvalues.shell }}"
+    comments:
+
+vm_users_delete:
+  - devop
+  - devop1
+  - devop2
+  - devop3
+  - devops
+  - devops1
+  - devops2
+  - devops3
+  - admin
+  - admin1
+  - admin2
+  - admin3
+  - admins
+  - admins1
+  - admins2
+  - admins3
+  - user
+  - user1
+  - user2
+  - user3
+  - users1
+  - users2
+  - users3

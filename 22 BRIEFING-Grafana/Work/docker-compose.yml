@@ -1,0 +1,169 @@
+version: '3.2'
+
+networks:
+  monitoring:
+    driver: bridge
+    name: monitoring
+    external: true
+
+volumes:
+  prometheus_data:
+  grafana-config:
+  grafana-data:
+  grafana-home:
+  grafana-logs:
+  grafana-plugins:
+  grafana-provisioning:
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    labels:
+      org.label-schema.group: "monitoring"
+    ports:
+      - 9090:9090
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus_rules.yml:/etc/prometheus/prometheus_rules.yml
+      - ./prometheus/node_exporter.crt:/etc/prometheus/node_exporter.crt
+      - prometheus_data:/prometheus
+    depends_on:
+      - cadvisor
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    labels:
+      org.label-schema.group: "monitoring"
+    volumes:
+      - '/:/host:ro,rslave'
+      - './node-exporter/config/config.yml:/etc/node-exporter/config.yml'
+      - './node-exporter/password/passwordfile.txt:/etc/node-exporter/passwordfile.txt'
+      - './node-exporter/cert/node_exporter.crt:/etc/node-exporter/node_exporter.crt'
+      - './node-exporter/cert/node_exporter.key:/etc/node-exporter/node_exporter.key'
+      # openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout node_exporter.key -out node_exporter.crt -subj "/C=ZA/ST=CT/L=SA/O=VPN/CN=localhost" -addext "subjectAltName = DNS:localhost"
+      # htpasswd -nBC 10 "" | tr -d ':\n'; echo
+    command:
+      - '--path.rootfs=/host'
+      - '--web.config.file=/etc/node-exporter/config.yml'
+    ports:
+      - 9100:9100
+    # network_mode: host
+    networks:
+      - monitoring
+    pid: host
+    restart: unless-stopped
+
+
+# docker run --detach --network monitoring --name mdb --env MARIADB_USER=user --env MARIADB_PASSWORD=pw --env MARIADB_ROOT_PASSWORD=pw  mariadb:latest
+# docker run --name node-test1 --detach --network monitoring bitnami/node-exporter:latest
+
+# --web.enable-lifecycle \
+# --web.listen-address=0.0.0.0:9100 \
+# --web.telemetry-path=/metrics \
+# --web.auth-file=/chemin/vers/fichier/.htpasswd
+
+
+
+  # node-exporter:
+  #   image: prom/node-exporter:latest
+  #   container_name: node-exporter
+  #   labels:
+  #     org.label-schema.group: "monitoring"
+  #   volumes:
+  #     - /:/rootfs:ro
+  #     - /proc:/host/proc:ro
+  #     - /sys:/host/sys:ro
+  #   command:
+  #     - '--path.rootfs=/rootfs'
+  #     - '--path.procfs=/host/proc'
+  #     - '--path.sysfs=/host/sys'
+  #     - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+  #   # expose:
+  #   #   - 9100
+  #   ports:
+  #     - 9100:9100
+  #   networks:
+  #     - monitoring
+  #   restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    labels:
+      org.label-schema.group: "monitoring"
+    volumes:
+      - ./alertmanager:/etc/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - 9093:9093
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    # image: grafana/alpine:3.15.4
+    container_name: grafana
+    labels:
+      org.label-schema.group: "monitoring"
+    # environment:
+    #   - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
+    #   - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+    #   - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      # - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+      - grafana-config:/etc/grafana
+      - grafana-data:/var/lib/grafana
+      - grafana-home:/usr/share/grafana
+      - grafana-logs:/var/log/grafana
+      - grafana-plugins:/var/lib/grafana/plugins
+      - grafana-provisioning:/etc/grafana/provisioning
+    ports:
+      - 3000:3000
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    labels:
+      org.label-schema.group: "monitoring"
+    privileged: true
+    ports:
+      - 8080:8080
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      #- /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # redis:
+  #   image: redis:latest
+  #   container_name: redis
+  #   ports:
+  #     - 6379:6379
+  #   networks:
+  #     - monitoring
+  #   restart: unless-stopped
+

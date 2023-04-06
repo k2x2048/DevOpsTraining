@@ -1,0 +1,86 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# unless Vagrant.has_plugin?("vagrant-docker-compose")
+#   system("vagrant plugin install vagrant-docker-compose")
+#   puts "Dependencies installed, please try the command again."
+#   exit
+# end
+
+Vagrant.configure("2") do |config|
+  
+  # Assign a friendly name to this host VM
+  config.vm.box = "ubuntu/bionic64"
+  
+  #will add the entry 127.0.X.1 myhost myhost.local to /etc/hosts
+  #config.vm.hostname = "myhost.local"
+  
+  #will add the entry 192.168.0.1 myhost myhost.local to /etc/hosts
+  #config.vm.network "public_network", ip: "192.168.0.1", hostname: true
+  #config.vm.network "public_network", ip: "192.168.0.2"
+  #config.vm.network "private_network", ip: "192.168.33.11"
+
+  #config.vm.network "private_network", ip: "192.168.56.99"
+  #config.vm.network "public_network"
+
+  #config.vm.network "forwarded_port", guest: 80, host: 8008, host_ip: "127.0.0.1", auto_correct: false
+  config.vm.network "forwarded_port", guest: 80, host: 8008
+
+  #config.vm.synced_folder "compose/", "/vagrant"
+
+  #config.vm.provision :shell, inline: "apt-get update"
+  config.vm.provision :docker
+  #config.vm.provision :docker_compose, env: { "PORT" => "#{port}" }, yml: ["/vagrant/compose/docker-compose.yml"], rebuild: true, project_name: "myproject", run: "always"
+  
+  config.vm.provision "shell", inline: <<-SHELL
+    cd /vagrant/compose
+    docker compose up -d
+  SHELL
+end
+
+  # Vagrant.configure("2") do |config|
+  #   config.vm.define "wp" do |app|
+  #     app.vm.provider "docker" do |d|
+  #       # via https://github.com/mitchellh/vagrant/issues/3728
+  #       d.vagrant_vagrantfile = "./docker-host-vm/Vagrantfile"
+  #       d.image = "tutum/wordpress"
+  #       d.ports = [ "8080:80" ]
+  #     end
+  #   end
+  # end
+
+
+# ENV['VAGRANT_DEFAULT_PROVIDER'] = 'docker'
+# Vagrant.configure("2") do |config|
+#   config.vm.define "vertxdev" do |a|
+#     a.vm.provider "docker" do |d|
+#       d.image = "vertxdev:latest"
+#       d.ports = ["8080:8080"]
+#       d.name = "vertxdev"
+#       d.remains_running = true
+#       d.cmd = ["vertx", "run", "vertx-examples/src/raw/java/httphelloworld/HelloWorldServer.java"]
+#       d.volumes = ["/src/vertx/:/usr/local/src"]
+#       d.vagrant_machine = "dockerhost"
+#       d.vagrant_vagrantfile = "./DockerHostVagrantfile"
+#     end
+#   end
+#   config.vm.define "vertxdev-client" do |a|
+#     a.vm.provider "docker" do |d|
+#       d.image = "vertxdev:latest"
+#       d.name = "vertxdev-client"
+#       d.link("vertxdev:vertxdev")
+#       d.remains_running = false
+#       d.cmd = ["wget","-qO", "-","--save-headers","http://vertxdev:8080"]
+#       d.vagrant_machine = "dockerhost"
+#       d.vagrant_vagrantfile = "./DockerHostVagrantfile"
+#     end
+#   end
+# end
+
+
+  # # VBox Settings
+  # config.vm.provider "virtualbox" do |vb|
+  #   # Customize the amount of RAM and CPU
+  #   vb.memory = 3072
+  #   vb.cpus = 2
+  # end

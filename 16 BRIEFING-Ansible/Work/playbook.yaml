@@ -1,0 +1,288 @@
+---
+- name: Base Config of VM # Name of this Ansible play
+  hosts: me
+  # hosts: not_used
+  # hosts: becode
+  # order: inventory # Host order: value can be 'inventory' ie as is in the inventory file, reverse_inventory, sorted (alpha), reverse_sorted, shuffle (random)
+  
+  remote_user: devops1
+  #remote_user: becode
+  become: true # Boolean that controls if privilege escalation is used or not on Task execution. 
+  #become_exe: "sudo su -" # Path to the executable used to elevate privileges. Implemented by the become plugin. 
+  #become_flags: # A string of flag(s) to pass to the privilege escalation program when become is True
+  #become_method: sudo # Which method of privilege escalation to use (such as sudo or su).
+  #become_user: devops1
+  #become_user: becode # User that you ‘become’ after using privilege escalation. The remote/login user must have permissions to become this user.
+  #check_mode: # A boolean that controls if a task is executed in ‘check’ mode.
+  
+  gather_facts: true # We are not using any gather facts in this playbook so disabling it (script will be faster).
+  ignore_errors: no # # Ignore the exit code
+
+  vars_files:
+    - ./vault/passwords.yaml # Encypted (vault) yaml password file
+    - ./vars/becode_users.yaml # List of users with their properties
+
+  vars: # Define variables.
+
+    SetupSSH: no
+    SetupGroups: no
+    SetupUsers: no
+    DelUsers: no
+    DelGroups: no
+    
+    SetupFilemanager: no 
+    SetupFirewall: yes
+    SetupDocker: no
+    CleanDocker: no
+    RunDocker: no
+
+    # # General for all connections:
+    # ansible_connection: smart # Connection type to the host. This can be the name of any of ansible’s connection plugins. SSH protocol types are smart, ssh or paramiko.
+    # ansible_host: hostname # The name of the host to connect to, if different from the alias you wish to give to it.
+    # ansible_port: 22 # The connection port number, if not the default (22 for ssh)
+    # ansible_user: admin # The user name to use when connecting to the host
+    # ansible_password: password # The password to use to authenticate to the host (never store this variable in plain text; always use a vault. See Keep vaulted variables safely visible)
+
+    # # SSH connection:
+    # ansible_ssh_private_key_file: /home/example/.ssh/aws.pem # Private key file used by ssh. Useful if using multiple keys and you don’t want to use SSH agent.
+    # ansible_ssh_common_args: # This setting is always appended to the default command line for sftp, scp, and ssh. Useful to configure a ProxyCommand for a certain host (or group).
+    # ansible_sftp_extra_args: # This setting is always appended to the default sftp command line.
+    # ansible_scp_extra_args: # This setting is always appended to the default scp command line.
+    # ansible_ssh_extra_args: # This setting is always appended to the default ssh command line.
+    # ansible_ssh_pipelining: # Determines whether or not to use SSH pipelining. This can override the pipelining setting in ansible.cfg.
+    # ansible_ssh_executable: # This setting overrides the default behavior to use the system ssh. This can override the ssh_executable setting in ansible.cfg.
+
+    # # Privilege escalation:
+    # ansible_become: yes # Equivalent to ansible_sudo or ansible_su, allows to force privilege escalation
+    # ansible_become_method: sudo # Allows to set privilege escalation method (sudo, su, ...)
+    # ansible_become_user: # Equivalent to ansible_sudo_user or ansible_su_user, allows to set the user you become through privilege escalation
+    # ansible_become_password: # Equivalent to ansible_sudo_password or ansible_su_password, allows you to set the privilege escalation password (never store this variable in plain text; always use a vault. See Keep vaulted variables safely visible)
+    #ansible_become_password: '{{ becodepass_crypted }}'
+    ansible_become_password: '{{ devops1pass_crypted }}'
+    # ansible_become_exe: # Equivalent to ansible_sudo_exe or ansible_su_exe, allows you to set the executable for the escalation method selected
+    # ansible_become_flags: # Equivalent to ansible_sudo_flags or ansible_su_flags, allows you to set the flags passed to the selected escalation method. This can be also set globally in ansible.cfg in the sudo_flags option
+
+    # # Remote host environment parameters:
+    # ansible_shell_type: # The shell type of the target system. You should not use this setting unless you have set the ansible_shell_executable to a non-Bourne (sh) compatible shell. By default commands are formatted using sh-style syntax. Setting this to csh or fish will cause commands executed on target systems to follow those shell’s syntax instead.
+    # ansible_python_interpreter: /usr/local/bin/python # The target host python path. This is useful for systems with more than one Python or not located at /usr/bin/python such as *BSD, or where /usr/bin/python is not a 2.X series Python. We do not use the /usr/bin/env mechanism as that requires the remote user’s path to be set right and also assumes the python executable is named python, where the executable might be named something like python2.6.
+    # ansible_*_interpreter: /usr/bin/ruby.1.9.3 # Works for anything such as ruby or perl and works just like ansible_python_interpreter. This replaces shebang of modules which will run on that host.
+
+    # # Non-SSH connection types
+    # local: # This connector can be used to deploy the playbook to the control machine itself.
+    # docker: # This connector deploys the playbook directly into Docker containers using the local Docker client. The following parameters are processed by this connector:
+    # ansible_host: # The name of the Docker container to connect to.
+    # ansible_user: # The user name to operate within the container. The user must exist inside the container.
+    # ansible_become: # If set to true the become_user will be used to operate within the container.
+    # ansible_docker_extra_args: # Could be a string with any additional arguments understood by Docker, which are not command specific. This parameter is mainly used to configure a remote Docker daemon to use.
+
+  tasks: # List of tasks to be executed
+
+    # - name: Add ssh key 
+    #   local_action: ansible.builtin.command /usr/bin/take_out_of_pool {{ inventory_hostname }}
+    #   when: SetupSSH
+
+
+    # ========== GROUPS SETUP ==========
+ 
+    - name: Ensure groups in vm_groups exists
+      become: true
+      #become_user: root
+      ansible.builtin.group:
+        name: '{{ item.name }}' # Name of the group to manage.
+        state: present # Whether the group should be present or not on the remote host. "absent" / "present"
+        # gid: '{{ item.gid }}' # Optional GID to set for the group.
+        system: '{{ item.issystem }}' # If yes, indicates that the group created is a system group.
+      when: SetupGroups
+      loop: "{{ vm_groups }}"
+      #loop_control:
+      #  pause: 1
+      # index_var: my_idx # This directive specifies a variable name to contain the current loop index. index_var is 0 indexed.
+
+
+    # ========== USERS SETUP ==========
+    - name: Configure users listed in becode_users.yaml in hosts.
+      become: true
+      ansible.builtin.user: # Ansible user module. It manage user accounts and user attributes.
+        name: '{{ item.login }}' # Name of the user to create, remove or modify.
+        #uid: 1000 # Optionally sets the UID of the user.
+        state: present # Whether the account should exist or not, taking action if the state is different from what is stated. "absent" / "present" (default)
+        #remove: true # This only affects state=absent, it attempts to remove directories associated with the user. The behavior is the same as userdel --remove.
+        #force: true # This only affects state=absent, it forces removal of the user and associated directories on supported platforms.
+        shell: '{{ item.shell }}' # Optionally set the user’s shell.
+        password: "{{ item.password }}" # User password hashed
+        update_password: always # always(default) will update passwords if they differ. on_create will only set the password for newly created users.
+        #password_expire_min: 10 # Minimum number of days between password change. Supported on Linux only.
+        #password_expire_max: 90 # Maximum number of days between password change. Supported on Linux only.
+        groups: '{{ item.groups }}' # List of groups user will be added to. By default, the user is removed from all other groups. Configure append to modify this.
+        append: '{{ item.groupsappend }}' # If true (default), add the user to the groups specified in groups. If false, user will only be added to the groups specified in groups, removing them from all other groups.
+        group: '{{ item.primarygroup }}' # Optionally sets the user’s primary group (takes a group name).
+        #generate_ssh_key: true # Whether to generate a SSH key for the user in question. This will not overwrite an existing SSH key unless used with force=yes.
+        #ssh_key_bits: 4096 # Optionally define the comment for the SSH key.
+        #ssh_key_comment: DevOpsKey1 # Optionally define the comment for the SSH key. Default: "ansible-generated on $HOSTNAME"
+        #ssh_key_file: .ssh/id_rsa # Optionally specify the SSH key filename. If this is a relative filename then it will be relative to the user’s home directory.
+        #ssh_key_passphrase: "" # Set a passphrase for the SSH key. If no passphrase is provided, the SSH key will default to having no passphrase.
+        #ssh_key_type: "rsa" # Optionally specify the type of SSH key to generate. Default: "rsa"
+        home: '/home/{{ item.login }}/' # Optionally set the user’s home directory.
+        #move_home: false # If set to true when used with home: attempt to move the user’s old home directory to the specified directory if it isn’t there already and the old home exists.
+        #create_home: true # Unless set to false, a home directory will be made for the user when the account is created or if the home directory does not exist.   
+        #system: false # When creating an account state=present, setting this to true makes the user a system account. This setting cannot be changed on existing users.
+      when: SetupUsers
+      loop: "{{ vm_users }}"
+
+    - name: Add devops1 SSH public key to all users.
+      become: true
+      authorized_key: # Adds or removes SSH authorized keys for particular user accounts.
+        #comment:  # Change the comment on the public key. If no comment is specified, the existing comment will be kept.
+        #exclusive: false # Whether to remove all other non-specified keys from the authorized_keys file.
+        user: '{{ item.login }}' # The username on the remote host whose authorized_keys file will be modified.
+        state: present # Whether the given key (with the given key_options) should or should not be in the file.
+        #key: "{{ lookup('file', '~/.ssh/id_rsa_devops1.pub') }}" # The SSH public key(s), as a string or (since Ansible 1.9) url (https://github.com/username.keys).
+        #key: https://github.com/charlie.keys
+        key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa_devops1.pub') }}"
+        # manage_dir: true # If set to true, the module will create the directory, as well as set the owner and permissions of an existing directory. Be sure to set manage_dir=false if you are using an alternate directory for authorized_keys, as set with path, since you could lock yourself out of SSH access.
+        # path: ~/.ssh/authorized_keys # Alternate path to the authorized_keys file.When unset, this value defaults to ~/.ssh/authorized_keys.
+        #validate_certs: True # This only applies if using a https url as the source of the keys. This should only set to false used on personally controlled sites using self-signed certificates as it avoids verifying the source site.
+      when: SetupUsers
+      loop: '{{ vm_users }}'
+      loop_control:
+        label: "{{ item.login }}"
+
+    - name: Allow 'devops' accounts to have passwordless sudo
+      become: true
+      lineinfile:
+        create: true # If specified, the file will be created if it does not already exist.
+        owner: root # Name of the user that should own the filesystem object, as would be fed to chown.
+        group: root # Name of the group that should own the filesystem object, as would be fed to chown.
+        mode: '440' # The permissions the resulting filesystem object should have. You must either add a leading zero so that Ansible’s YAML parser knows it is an octal number (like 0644 or 01777) or quote it (like '644' or '1777') so Ansible receives a string and can do its own conversion from string into number.
+        path: /etc/sudoers.d/devops # The file to modify. Before Ansible 2.3 this option was only usable as "dest".
+        regexp: '^%{{ item.login }} ALL' # The regular expression to look for in every line of the file.
+        # search_string: '%{{ item.name }} ALL=(ALL) NOPASSWD: ALL' # The literal string to look for in every line of the file. This does not have to match the entire line. For state=present, the line to replace if the string is found in the file. Only the last line found will be replaced. For state=absent, the line(s) to remove if the string is in the line.
+        # insertbefore: '^\t<Location \/>\n' # If specified, the line will be inserted before the last match of specified regular expression.
+        # insertafter: '^\t<Location \/>\n' # If specified, the line will be inserted after the last match of specified regular expression.
+        #line: "%{{ item.present }} ALL=(ALL) NOPASSWD: ALL"
+        line: '%{{ item.login }} ALL=(ALL) NOPASSWD: ALL'
+        state: present
+        validate: /usr/sbin/visudo -cf %s # The validation command to run before copying the updated file into the final destination.
+      when: (SetupUsers) and (item.primarygroup == 'devops')
+      loop: "{{ vm_users }}"
+      loop_control:
+        label: "{{ item.login }}"
+
+
+    # ========== DEL USERS AND GROUPS ==========
+
+    - name: Delete users listed in "vm_users_delete"
+      become: true
+      ansible.builtin.user:
+        name: '{{ item }}'
+        state: absent
+        remove: true
+        force: true
+      loop: "{{ vm_users_delete }}"
+      when: DelUsers
+
+    - name: Delete groups listed in "vm_groups_delete"
+      become: true
+      ansible.builtin.group:
+        name: '{{ item }}'
+        state: absent
+      loop: "{{ vm_groups_delete }}"
+      when: DelGroups
+
+
+    # ========== SETUP APTITUDE ==========
+
+    # - name: Install aptitude
+    #   apt:
+    #     name: aptitude
+    #     state: latest
+    #     update_cache: true
+
+    # - name: Mise à jour des paquets aptitude
+    #   become: true
+    #   apt:
+    #     update_cache: yes
+    #   when: (SetupFilemanager == true) or (SetupFirewall == true) or (SetupDocker == true)
+
+
+    # ========== SETUP FILE MANAGER ==========
+
+    - name: Setup file manager
+      ansible.builtin.import_tasks: ./tasks/install_file_managers.yaml
+      when: SetupFilemanager == true
+
+
+    # ========== SETUP FIREWALL ==========
+
+    - name: Configure ufw Firewall
+      ansible.builtin.import_tasks: ./tasks/configure_ufw.yaml
+      when: SetupFirewall == true
+
+
+    # ========== SETUP DOCKER ==========
+
+    - name: Setup Docker
+      ansible.builtin.import_tasks: ./tasks/install_docker_on_ubuntu.yaml
+      when: SetupDocker == true
+
+
+    # ========== RUN DOCKER ==========
+
+    - name: Run Docker Compose
+      ansible.builtin.import_tasks: ./tasks/run_docker_compose_web.yaml
+      when: RunDocker == true
+
+
+    # ========== CLEAN DOCKER ==========
+
+    - name: Setup Docker
+      ansible.builtin.import_tasks: ./tasks/clean_docker_on_ubuntu.yaml
+      when: CleanDocker == true
+
+
+    # ========== DISPLAY/SAVE ALL FACTS VARIABLES ==========
+
+    - name: Print all available facts
+      ansible.builtin.debug:
+        var: ansible_facts
+      register: facts_output
+      no_log: true
+
+    - name: Save output to file
+      copy:
+        content: "{{ facts_output }}"
+        dest: "./facts.txt"
+      delegate_to: localhost
+      run_once: true
+
+
+    - name: Write facts to disk using a template
+      copy:
+        content: |
+          #jinja2: lstrip_blocks: True
+          EOS device info:
+            {% for host in groups['eos'] %}
+            Hostname: {{ hostvars[host].ansible_net_hostname }}
+            Version: {{ hostvars[host].ansible_net_version }}
+            Model: {{ hostvars[host].ansible_net_model }}
+            Serial: {{ hostvars[host].ansible_net_serialnum }}
+            {% endfor %}
+
+          IOS device info:
+            {% for host in groups['ios'] %}
+            Hostname: {{ hostvars[host].ansible_net_hostname }}
+            Version: {{ hostvars[host].ansible_net_version }}
+            Model: {{ hostvars[host].ansible_net_model }}
+            Serial: {{ hostvars[host].ansible_net_serialnum }}
+            {% endfor %}
+
+          VyOS device info:
+            {% for host in groups['vyos'] %}
+            Hostname: {{ hostvars[host].ansible_net_hostname }}
+            Version: {{ hostvars[host].ansible_net_version }}
+            Model: {{ hostvars[host].ansible_net_model }}
+            Serial: {{ hostvars[host].ansible_net_serialnum }}
+            {% endfor %}
+        dest: "./facts2.txt"
+        delegate_to: localhost
+      run_once: yes

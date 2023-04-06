@@ -1,0 +1,40 @@
+version: '2.1'
+
+services:
+
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    labels:
+      org.label-schema.group: "monitoring"
+    volumes:
+      - '/:/host:ro,rslave'
+    command:
+      - '--path.rootfs=/host'
+    expose:
+      - 9100
+    network_mode: host
+    networks:
+      - monitoring
+    pid: host
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    labels:
+      org.label-schema.group: "monitoring"
+    privileged: true
+    ports:
+      - 8080:8080
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      #- /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+    networks:
+      - monitoring
+    restart: unless-stopped
+

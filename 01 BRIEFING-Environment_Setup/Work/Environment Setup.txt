@@ -1,0 +1,23 @@
+I am working With Windows 11 Home.
+I installed Linux Windows Subsystem (not usable because VirtualBox Compatibility).
+
+I installed Cygwin.
+
+I can start many linux live ISO images in VirtualBox or intall it if needed.
+https://www.virtualbox.org
+
+I can also Boot from USB drive with Linux.
+https://www.ventoy.net/en/download.html
+
+
+As simple text editor I use Notepad3.
+https://www.rizonesoft.com/downloads/notepad3/
+
+If I need more advanced (IntelliSense, run/debug scripts) I use Visual Studio Code
+https://code.visualstudio.com/download
+
+
+As terminal I use Putty. It support many communication protocols via network or serial Ports.
+
+I can start many VM with VirtualBox.
+https://www.virtualbox.org

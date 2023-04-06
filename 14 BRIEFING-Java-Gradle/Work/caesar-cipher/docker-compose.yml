@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+
+  caesar-cipher-app: # caesar-cipher java app
+    #container_name: mycontainername
+    build: # Build an image with all needed dependencies
+      context: ./ # Use this base path for all commands in dockerfile
+      dockerfile: ./docker/dockerfile # Specify dockerfile path
+    #hostname: myhostname
+    image: caesar-cipher:1.0
+    restart: unless-stopped
+    #stdin_open: true # keep open the terminal after building container
+    #tty: true # keep open the terminal after building container

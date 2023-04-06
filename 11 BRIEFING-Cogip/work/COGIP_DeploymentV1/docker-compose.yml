@@ -1,0 +1,43 @@
+version: "3.9"
+services:
+
+  mariadb:
+    #hostname: mariadb_host
+    #container_name: mariadb_containername
+    build: './mariadb'
+    image: mariadb:10.4
+    #command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_520_ci
+    ports:
+      - "3306:3306"
+    environment:
+      #MARIADB_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: cogip
+      MYSQL_USER: cogip-user
+      MYSQL_PASSWORD: cogip-pw
+    user: root
+    volumes:
+      - ./mariadb/data-db:/var/lib/mysql
+      - ./mariadb/init/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: always
+
+  php-apache:
+    build: './php-apache'
+    ports:
+      - "80:80"
+    user: root
+    volumes:
+      - ./php-apache/data-web:/var/www/html
+      #- ./php-apache/data-php/php.ini:/usr/local/etc/php/php.ini
+    depends_on:
+      - mariadb
+    restart: always
+    
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:4.8.1
+    ports:
+      - 8080:80
+    environment:
+      - PMA_ARBITRARY=1
+      #- PMA_HOST=mariadb
+    restart: always

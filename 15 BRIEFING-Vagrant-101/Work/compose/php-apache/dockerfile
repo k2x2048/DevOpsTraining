@@ -1,0 +1,7 @@
+FROM php:7.2.5-apache
+USER root
+RUN apt-get update && \
+    docker-php-ext-install mysqli pdo pdo_mysql && \
+    a2enmod rewrite
+COPY --chown=root:root ./data-web /var/www/html
+

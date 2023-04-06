@@ -1,0 +1,11 @@
+[Unit]
+Description=Useless Service
+
+[Service]
+User=user
+WorkingDirectory=/home/user/scripts/
+ExecStart=/bin/bash /usr/bin/serviscript.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

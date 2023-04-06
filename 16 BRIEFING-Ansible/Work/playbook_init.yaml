@@ -1,0 +1,90 @@
+---
+#run with: ansible-playbook playbook_init.yaml --ask-vault-pass
+
+- name: Base Config of VM
+  # hosts: vmsdt-xxxxxxx.becode.org # List of hosts or host group against which we want to run the task.
+  hosts: me
+  # hosts: not_used
+  # hosts: becode
+  # order: inventory # Host order: value can be 'inventory' ie as is in the inventory file, reverse_inventory, sorted (alpha), reverse_sorted, shuffle (random)
+  
+  remote_user: becode
+  become: true
+
+  gather_facts: false
+  ignore_errors: no
+
+  vars_files:
+    - ./vault/passwords.yaml # Encypted (vault) yaml password file
+    - ./vars/becode_users.yaml # List of users with their properties
+
+  vars:
+    # ansible_password: '{{ becodepass_crypted }}'
+    # ansible_become_password: '{{ becodepass_crypted }}'
+    ansible_password: '{{ becodedefaultpass_crypted }}'
+    ansible_become_password: '{{ becodedefaultpass_crypted }}'
+
+  tasks:
+
+    # ========== GROUPS SETUP ==========
+ 
+    - name: Ensure devops group exists
+      become: true
+      ansible.builtin.group:
+        name: devops # Name of the group to manage.
+        state: present # Whether the group should be present or not on the remote host. "absent" / "present"
+        system: yes # If yes, indicates that the group created is a system group.
+
+
+    # ========== USERS SETUP ==========
+    
+    - name: Configure root user
+      become: true
+      ansible.builtin.user:
+        name: root
+        state: present
+        shell: /bin/bash
+        password: "{{ rootpass_crypted }}"
+        update_password: always
+
+    - name: Configure devops1 user
+      become: true
+      ansible.builtin.user:
+        name: devops1
+        state: present
+        shell: /bin/bash
+        password: "{{ devops1pass_crypted }}"
+        update_password: always
+        groups: sudo,devops,admins
+        append: true
+        group: devops
+        home: /home/devops1/
+
+    - name: Configure becode user
+      become: true
+      ansible.builtin.user:
+        name: becode
+        state: present
+        shell: /bin/bash
+        password: "{{ becodepass_crypted }}"
+        update_password: always
+        groups: sudo,devops,admins
+        append: true
+        group: devops
+        home: /home/becode/
+
+
+    - name: Add devops1 SSH public key
+      become: true
+      authorized_key:
+        user: devops1
+        state: present
+        key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa_devops1.pub') }}"
+
+    - name: Add becode SSH public key
+      become: true
+      authorized_key:
+        exclusive: true
+        user: becode
+        state: present
+        key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa_devops1.pub') }}"

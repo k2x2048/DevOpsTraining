@@ -1,0 +1,28 @@
+---
+- name: Make sure destination dir exists
+  become: true
+  file:
+    path: '/docker/'
+    state: directory
+    owner: devops1
+    group: docker
+    mode: '0775'
+
+- name: Copy docker-compose.yml & cie
+  become: yes
+  copy:
+    src: ./DATA/docker/
+    dest: /docker/
+    owner: devops1
+    group: docker
+    mode: '0775'
+
+- name: Run Docker Compose
+  become: yes
+  community.general.docker_compose:
+    project_src: /docker/
+    project_name: webserver
+    #stopped: true
+    #restarted: true
+    state: present
+

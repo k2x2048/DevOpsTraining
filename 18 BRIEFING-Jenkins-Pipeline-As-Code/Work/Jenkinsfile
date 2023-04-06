@@ -1,0 +1,202 @@
+pipeline {
+	agent any
+	// agent {
+		// label 'agentId' //The id of the slave/agent where the build should be executed, if it doesn't matter use "agent any" instead.
+	    // docker {
+        // image 'maven:3.9.0-eclipse-temurin-11'
+        // label 'my-defined-label'
+        // args  '-v /tmp:/tmp'
+	// }
+
+	triggers {
+		//    |------ Minute (0-59)
+		//    | |------ Hour (0-23)
+		//    | | |------ Day of the month (1-31)
+		//    | | | |------ Month (1-12)
+		//    | | | | |------ Day of the Week (1-7, Monday to Sunday)
+		//cron('0 */6 * * *') //regular builds
+		pollSCM('0 */6 * * *') //polling for changes
+	}
+
+	environment {
+		clonerepo = "https://github.com/k2x2048/caesar-cipher.git"
+		publishrepo = "k2x2048/caesar-cipher"
+		publishrepoowner = "k2x2048"
+		publishreponame = "caesar-cipher"
+	}
+
+	stages {
+
+		// stage('cloning git repo') {
+		//     git branch: 'main', url:'https://github.com/naiveskill/devops.git'
+		//     sh "chmod +x -R ./jenkins"
+		//     sh "./jenkins/script/scripted_pipeline_ex_2.sh"
+		// }
+
+		stage('Unit Test') {
+			steps {
+				sh './gradlew clean test' //run a gradle task
+			}
+			post {
+				success {
+					echo 'Unit Test OK'
+				}
+				failure { 
+					echo 'Unit Test Failure'
+				}
+			}
+		}
+
+		stage('Build') {
+			steps {
+				script {
+					if (isUnix()) {
+						sh './gradlew build'
+					} else {
+						bat 'gradlew.bat build'
+					}
+				}
+			}
+			post {
+				success {
+					echo 'Build OK'
+				}
+				failure { 
+					echo 'Build Failure'
+				}
+			}
+		}
+		
+		stage('Run & Test program') {
+			steps {
+				script {
+					def output = sh(returnStdout: true, script: 'java -jar ./build/libs/caesar-cipher.jar').trim()
+					if (output.contains('Message:')) {
+						echo "  'Message:' ok"
+					} else {
+						echo "  'Message:' Error"
+						exit 1
+					}
+				}
+			}
+			post {
+				success {
+					echo 'Run & Test program OK'
+				}
+				failure { 
+					echo 'Run & Test program Failure'
+				}
+			}
+		} 
+
+		stage('Test Web Request') {
+			steps {
+				script {   
+					final String url = "http://localhost:8080"
+					final String responsecode = sh(script: "curl -s -o /dev/null -w '%{http_code}\n' $url", returnStdout: true).trim()
+					if (responsecode == '200' || responsecode == '403')  {
+						echo 'Test Web Request 1/2 ok'
+					} else {
+						echo 'Test Web Request 1/2 ERROR'
+						exit 1
+					}
+
+					final String response = sh(script: "curl -s $url | grep 'Authentication required'", returnStdout: true).trim()
+					if (response == 'Authentication required') {
+						echo 'Test Web Request 2/2 OK'
+					} else {
+						echo 'Test Web Request 2/2 ERROR'
+						exit 1
+					}
+				}
+			}
+			post {
+				success {
+					echo 'Test Web Request OK'
+				}
+				failure { 
+					echo 'Test Web Request Failure'
+				}
+			}
+		}
+
+		stage('Release ZIP') {
+			steps {
+				script {
+					dir("${env.WORKSPACE}/build") {
+						def ZIP_SOURCEDIR="./libs"
+						def ZIP_OUTFILE="release_b${env.BUILD_ID}.zip"
+						sh "zip -r ${ZIP_OUTFILE} ${ZIP_SOURCEDIR}"
+					}
+				}
+			}
+			post {
+				success {
+					echo 'Release ZIP OK'
+				}
+				failure { 
+					echo 'Release ZIP Failure'
+				}
+			}
+		}
+
+		stage('Release') {
+			steps {
+				withCredentials([string(credentialsId: 'github-token', variable: 'gitHubToken')]) {
+					script {
+						def releaseTag = sh(script: "git describe --tags | awk -F - \'{print \$1}\'",label:'Get latest tag',returnStdout: true).trim()
+						echo "releaseTag: ${releaseTag}"
+						
+						def releaseName = "${releaseTag}-auto"
+						echo "releaseName: ${releaseName}"
+						def releaseBranch = "main"
+						def releaseDecription = "Automated build by Jenkins"
+
+						final String releaseId =
+							sh(script: """
+								curl -s -L \
+									-X POST \
+									-H "Accept: application/vnd.github+json" \
+									-H "Authorization: Bearer ${gitHubToken}" \
+									-H "X-GitHub-Api-Version: 2022-11-28" \
+									https://api.github.com/repos/${env.publishrepoowner}/${env.publishreponame}/releases \
+									-d '{"tag_name":"${releaseTag}","target_commitish":"${releaseBranch}","name":"${releaseName}","body":"${releaseDecription}","draft":false,"prerelease":false,"generate_release_notes":false}' \
+									| jq -r '.id'
+								"""
+						,label: 'Get latest releaseId',returnStdout: true).trim()
+						echo "releaseId: ${releaseId}"
+
+						sh (script: """
+							curl -s -X POST \
+							-H "Authorization: Bearer ${gitHubToken}" \
+							--header "Content-Type: application/zip" \
+							--data-binary @"./build/release_b${env.BUILD_ID}.zip" "https://uploads.github.com/repos/${env.publishrepoowner}/${env.publishreponame}/releases/${releaseId}/assets?name=release_b${env.BUILD_ID}.zip"
+							"""
+							,label: 'Upload build file',returnStdout: false)   
+
+					}
+				}
+			}
+			post {
+				success {
+					echo 'Release OK'
+				}
+				failure { 
+					echo 'Release Failure'
+				}
+			}
+		} 
+
+		stage('Deploy') {
+			when {
+				expression {
+					currentBuild.result == null || currentBuild.result == 'SUCCESS' 
+				}
+			}
+			steps {
+				echo "Deploy - make publish"
+			}
+		}
+
+	}
+}

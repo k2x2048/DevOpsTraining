@@ -1,0 +1,115 @@
+version: '3.8'
+
+volumes:
+  jenkins-data:
+  jenkins-docker-certs:
+  # gitlab-config:
+  # gitlab-logs:
+  # gitlab-data:
+  # gitlab-runner:
+
+networks:
+  jenkins:
+    driver: bridge
+
+services:
+  jenkins:
+    build: './jenkins/'
+    # image: jenkins/jenkins:lts
+    container_name: jenkins
+    # privileged: true
+    # user: root
+    ports:
+      - 8080:8080
+      - 50000:50000
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - jenkins-docker-certs:/certs/client:ro
+      # - /usr/bin/docker:/usr/bin/docker
+      # - /usr/local/bin/docker:/usr/local/bin/docker
+      # - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      DOCKER_HOST: "tcp://dind:2376"
+      DOCKER_CERT_PATH: "/certs/client"
+      DOCKER_TLS_VERIFY: 1
+    depends_on:
+      - dind
+      # - ssh-agent
+      # - gitlab
+      # - sonar
+    networks:
+      - jenkins
+    restart: unless-stopped
+
+  dind:
+    image: docker:dind
+    container_name: dind
+    # user: root
+    privileged: true
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - jenkins-docker-certs:/certs/client
+    environment:
+      DOCKER_TLS_CERTDIR: "/certs"
+    ports:
+      - 2375:2375
+      - 2376:2376
+    networks:
+      jenkins:
+          aliases:
+            - docker
+    restart: unless-stopped
+  
+  # ssh-agent:
+  #   image: jenkins/ssh-agent
+  #   networks:
+  #     - jenkins
+  #   restart: unless-stopped
+
+  # gitlab: #GitLab server
+  #   image: gitlab/gitlab-ce:13.8.8-ce.0
+  #   # image: 'gitlab/gitlab-ee:latest'
+  #   container_name: gitlab
+  #   hostname: 'gitlab'
+  #   volumes:
+  #     - gitlab-config:/etc/gitlab
+  #     - gitlab-logs:/var/log/gitlab
+  #     - gitlab-data:/var/opt/gitlab
+  #   environment:
+  #     GITLAB_OMNIBUS_CONFIG: |
+  #       external_url 'http://gitlab'
+  #       # Add any other gitlab.rb configuration here, each on its own line
+  #   shm_size: '256m'
+  #   ports:
+  #     - "22:22"
+  #     - "443:443"
+  #     - "8081:80"
+  #   networks:
+  #     - jenkins
+  #   restart: unless-stopped
+
+  # gitlab-runner:
+  #   image: gitlab/gitlab-runner:alpine
+  #   container_name: gitlab-runner
+  #   volumes:
+  #     - 'gitlab-runner:/etc/gitlab-runner'
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   networks:
+  #     - jenkins
+  #   depends_on:
+  #     - gitlab
+  #   restart: unless-stopped
+
+  # sonar:
+  #   container_name: sonarqube
+  #   image: sonarqube
+  #   ports:
+  #     - "9000:9000"
+  #     - "9092:9092"
+  #   volumes:
+  #     - /etc/gitlab
+  #     - /var/log/gitlab
+  #     - /var/opt/gitlab
+  #   networks:
+  #     - jenkins
+  #   restart: unless-stopped

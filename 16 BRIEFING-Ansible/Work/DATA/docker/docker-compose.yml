@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+
+  # nginx Webserver & URL redirect
+  nginx:
+    image: nginx
+    container_name: Nginx_webserver
+    ports:
+      - "80:80"
+      #- "443:443"
+    environment:
+      - NGINX_HOST=localhost
+      - NGINX_PORT=80
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/html:/usr/share/nginx/html
+      #- /var/run/docker.sock:/tmp/docker.sock:ro
+      #- /var/docker/nginx/certs:/etc/nginx/certs
+      #- /var/docker/nginx/vhost:/etc/nginx/vhost.d
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  # MySQL database
+  mysql:
+    image: mysql
+    container_name: container_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: MySQL_root_password
+      MYSQL_USER: MySQL_user
+      MYSQL_PASSWORD: MySQL_user_password
+      MYSQL_DATABASE: Nginx_database
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: unless-stopped
+    #restart: always
+
+volumes:
+   db_data:
+
